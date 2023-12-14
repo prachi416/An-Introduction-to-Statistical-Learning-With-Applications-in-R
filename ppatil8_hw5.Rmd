@@ -1,0 +1,500 @@
+---
+title: "ppatil8_hw5"
+author: "Prachi Vijay Patil"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+########Lab########
+
+##Lab 7.8.1
+
+```{r}
+library(ISLR2)
+attach(Wage)
+fit <- lm(wage ~ poly(age, 4), data = Wage)
+coef(summary(fit))
+fit2 <- lm(wage ~ poly(age, 4, raw = T), data = Wage)
+coef(summary(fit2))
+fit2a <- lm(wage ~ age + I(age^2) + I(age^3) + I(age^4), data = Wage)
+coef(fit2a)
+fit2b <- lm(wage ~ cbind(age, age^2, age^3, age^4), data = Wage)
+agelims <- range(age)
+age.grid <- seq(from = agelims[1], to = agelims[2])
+preds <- predict(fit, newdata = list(age = age.grid), se = TRUE)
+se.bands <- cbind(preds$fit + 2 * preds$se.fit, preds$fit - 2 * preds$se.fit)
+par(mfrow = c(1, 2), mar = c(4.5, 4.5, 1, 1), oma = c(0, 0, 4, 0))
+plot(age, wage, xlim = agelims, cex = 0.5, col = "darkgrey")
+title("Degree-4 Polynomial", outer = T)
+lines(age.grid, preds$fit, lwd = 2, col = "blue")
+matlines(age.grid, se.bands, lwd = 1, col = "blue", lty = 3)
+preds2 <- predict(fit2, newdata = list(age = age.grid), se = TRUE)
+max(abs(preds$fit - preds2$fit))
+fit.1 <- lm(wage ~ age, data = Wage)
+fit.2 <- lm(wage ~ poly(age, 2), data = Wage)
+fit.3 <- lm(wage ~ poly(age, 3), data = Wage)
+fit.4 <- lm(wage ~ poly(age, 4), data = Wage)
+fit.5 <- lm(wage ~ poly(age, 5), data = Wage)
+anova(fit.1, fit.2, fit.3, fit.4, fit.5)
+
+coef(summary(fit.5))
+
+fit.1 <- lm(wage ~ education + age, data = Wage)
+fit.2 <- lm(wage ~ education + poly(age, 2), data = Wage)
+fit.3 <- lm(wage ~ education + poly(age, 3), data = Wage)
+anova(fit.1, fit.2, fit.3)
+
+fit <- glm(I(wage > 250) ~ poly(age, 4), data = Wage, family = binomial)
+preds <- predict(fit, newdata = list(age = age.grid), se = T)
+pfit <- exp(preds$fit) / (1 + exp(preds$fit))
+se.bands.logit <- cbind(preds$fit + 2 * preds$se.fit, preds$fit - 2 * preds$se.fit)
+se.bands <- exp(se.bands.logit) / (1 + exp(se.bands.logit))
+
+preds <- predict(fit, newdata = list(age = age.grid), type = "response", se = T)
+plot(age, I(wage > 250), xlim = agelims, type = "n", ylim = c(0, 0.2))
+points(jitter(age), I((wage > 250) / 5), cex = 0.5, pch = "|", col = "darkgrey")
+lines(age.grid, pfit, lwd = 2, col = "blue")
+matlines(age.grid, se.bands, lwd = 1, col = "blue", lty = 3)
+
+table(cut(age, 4))
+fit <- lm(wage ~ cut(age, 4), data = Wage)
+coef(summary(fit))
+```
+
+##Lab 7.8.2 Splines
+
+```{r}
+library(splines)
+fit <- lm(wage ~ bs(age, knots = c(25, 40, 60)), data = Wage)
+pred <- predict(fit, newdata = list(age = age.grid), se = T)
+plot(age, wage, col = "gray")
+lines(age.grid, pred$fit, lwd = 2)
+lines(age.grid, pred$fit + 2 * pred$se, lty = "dashed")
+lines(age.grid, pred$fit - 2 * pred$se, lty = "dashed")
+
+dim(bs(age, knots = c(25, 40, 60)))
+dim(bs(age, df = 6))
+attr(bs(age, df = 6), "knots")
+
+fit2 <- lm(wage ~ ns(age, df = 4), data = Wage)
+pred2 <- predict(fit2, newdata= list(age = age.grid), se = T)
+lines(age.grid, pred2$fit, col = "red", lwd = 2)
+
+plot(age, wage, xlim = agelims, cex = 0.5, col = "darkgrey")
+title("Smoothing Spline")
+fit <- smooth.spline(age, wage, df = 16)
+fit2 <- smooth.spline(age, wage, cv = TRUE)
+fit2$df
+
+lines(fit, col = "red", lwd = 2)
+lines(fit2, col = "blue", lwd = 2)
+legend("topright", legend = c("16 DF", "6.8 DF"), col = c("red", "blue"), lty = 1, lwd = 2, cex = 0.8)
+
+plot(age, wage, xlim = agelims, cex = 0.5, col = "darkgrey")
+title("Local Regression")
+fit <- loess(wage ~ age, span = 0.2, data = Wage)
+fit2 <- loess(wage ~ age, span = 0.5, data = Wage)
+lines(age.grid, predict(fit, data.frame(age = age.grid)), col = "red", lwd = 2)
+lines(age.grid, predict(fit2, data.frame(age = age.grid)), col = "blue", lwd = 2)
+legend("topright", legend = c("Span = 0.2", "Span = 0.5"), col = c("red", "blue"), lty = 1, lwd = 2, cex = 0.8)
+```
+
+##Lab 8.3.1 Fitting Classification Trees
+
+```{r}
+library(tree)
+library(ISLR2)
+attach(Carseats)
+High <- factor(ifelse(Sales <= 8, "No", "Yes"))
+Carseats <- data.frame(Carseats, High)
+tree.carseats <- tree(High ~. -Sales, Carseats)
+summary(tree.carseats)
+plot(tree.carseats)
+text(tree.carseats, pretty = 0)
+tree.carseats
+
+set.seed(2)
+train <- sample(1: nrow(Carseats), 200)
+Carseats.test <- Carseats[-train, ]
+High.test <- High[-train]
+tree.carseats <- tree(High ~. -Sales, Carseats, subset = train)
+tree.pred <- predict(tree.carseats, Carseats.test, type = "class")
+table(tree.pred, High.test)
+
+set.seed(7)
+cv.carseats <- cv.tree(tree.carseats, FUN = prune.misclass)
+names(cv.carseats)
+par(mfrow = c(1, 2))
+plot(cv.carseats$size, cv.carseats$dev, type = "b")
+plot(cv.carseats$k, cv.carseats$dev, type = "b")
+prune.carseats <- prune.misclass(tree.carseats, best = 9)
+plot(prune.carseats)
+text(prune.carseats, pretty = 0)
+tree.pred <- predict(prune.carseats, Carseats.test, type = "class")
+table(tree.pred, High.test)
+
+prune.carseats <- prune.misclass(tree.carseats, best = 14)
+plot(prune.carseats)
+text(prune.carseats, pretty = 0)
+tree.pred <- predict(prune.carseats, Carseats.test, type = "class")
+table(tree.pred, High.test)
+
+```
+
+##Lab 8.3.2 Fitting Regression Trees
+
+```{r}
+set.seed(1)
+train <- sample(1:nrow(Boston), nrow(Boston) / 2)
+tree.boston <- tree(medv ~., Boston, subset = train)
+summary(tree.boston)
+plot(tree.boston)
+text(tree.boston, pretty = 0)
+cv.boston <- cv.tree(tree.boston)
+plot(cv.boston$size, cv.boston$dev, type = "b")
+prune.boston <- prune.tree(tree.boston, best = 5)
+plot(prune.boston)
+text(prune.boston, pretty = 0)
+
+yhat <- predict(tree.boston, newdata = Boston[-train, ])
+boston.test <- Boston[-train, "medv"]
+plot(yhat, boston.test)
+abline(0, 1)
+mean((yhat - boston.test)^2)
+
+```
+
+#Lab 8.3.3 Bagging and Random Forests
+
+```{r}
+library(randomForest)
+set.seed(1)
+bag.boston <- randomForest(medv ~., data = Boston, subset = train, mtry = 12, importance = TRUE)
+bag.boston
+
+yhat.bag <- predict(bag.boston, newdata = Boston[-train, ])
+plot(yhat.bag, boston.test)
+abline(0, 1)
+mean((yhat.bag - boston.test)^2)
+bag.boston <- randomForest(medv ~., data = Boston, subset = train, mtry = 12, ntree = 25)
+yhat.bag <- predict(bag.boston, newdata = Boston[-train, ])
+mean((yhat.bag - boston.test)^2)
+
+set.seed(1)
+rf.boston <- randomForest(medv ~., data = Boston, subset = train, mtry = 6, importance = TRUE)
+yhat.rf <- predict(rf.boston, newdata = Boston[-train, ])
+mean((yhat.rf - boston.test)^2)
+varImpPlot(rf.boston)
+```
+
+#Lab 8.3.4 Boosting
+
+```{r}
+library(gbm)
+set.seed(1)
+boost.boston <- gbm(medv ~., data = Boston[train, ], distribution = "gaussian", n.trees = 5000, interaction.dept = 4)
+summary(boost.boston)
+plot(boost.boston, i = "rm")
+plot(boost.boston, i = "lstat")
+yhat.boost <- predict(boost.boston, newdata = Boston[-train, ], n.trees = 5000)
+mean((yhat.boost - boston.test)^2)
+boost.boston <- gbm(medv ~., data = Boston[train, ], distribution = "gaussian", n.trees = 5000, interaction.depth = 4, shrinkage = 0.2, verbose = F)
+yhat.boost <- predict(boost.boston, newdata = Boston[-train, ], n.trees = 5000)
+mean((yhat.boost - boston.test)^2)
+```
+
+#Lab 8.3.5 Bayesian Additive Regression Trees
+
+```{r}
+library(BART)
+x <- Boston[, 1:12]
+y <- Boston[, "medv"]
+xtrain <- x[train, ]
+ytrain <- y[train]
+xtest <- x[-train, ]
+ytest <- y[-train]
+set.seed(1)
+bartfit <- gbart(xtrain, ytrain, x.test = xtest)
+yhat.bart <- bartfit$yhat.test.mean
+mean((ytest - yhat.bart)^2)
+ord <- order(bartfit$varcount.mean, decreasing = T)
+bartfit$varcount.mean[ord]
+```
+
+########Exercise########
+
+##Exercise 8.4
+
+#Q.8.4.7
+
+```{r}
+library(ISLR2)
+library(randomForest)
+library(tree)
+attach(Wage)
+attach(Carseats)
+library(caTools)
+
+set.seed(1)
+Boston = Boston
+sample.data = sample.split(Boston$medv, SplitRatio = 0.70)
+train.set = subset(Boston, select =-c(medv), sample.data == TRUE)
+test.set = subset(Boston, select =-c(medv), sample.data == FALSE)
+train.Y = subset(Boston$medv, sample.data == TRUE)
+test.Y = subset(Boston$medv, sample.data == FALSE)
+
+p = 10
+Tree1 = randomForest(train.set, train.Y, test.set, test.Y, mtry = p, ntree = 800)
+Tree2 = randomForest(train.set, train.Y, test.set, test.Y, mtry = p/3, ntree = 800)
+Tree3 = randomForest(train.set, train.Y, test.set, test.Y, mtry = p/5, ntree = 800)
+Tree4 = randomForest(train.set, train.Y, test.set, test.Y, mtry = p/7, ntree = 800)
+Tree5 = randomForest(train.set, train.Y, test.set, test.Y, mtry = p/9, ntree = 800)
+Tree6 = randomForest(train.set, train.Y, test.set, test.Y, mtry = p/10, ntree = 800)
+
+x.axis = seq(1, 800, 1)
+plot(x.axis, Tree1$test$mse, xlab = "Number of Trees", ylab = "Test Error", ylim = c(5, 20),type ="b",lwd = 2)
+lines(x.axis, Tree2$test$mse, col = "red", lwd = 2)
+lines(x.axis, Tree3$test$mse, col = "green", lwd = 2)
+lines(x.axis, Tree4$test$mse, col = "darkgrey", lwd = 2)
+lines(x.axis, Tree5$test$mse, col = "blue", lwd = 2)
+lines(x.axis, Tree6$test$mse, col = "violet", lwd = 2)
+legend(600, 19, legend = c("m = p", "m = p/3", "m = p/5", "m = p/7", "m = p/9", "m = p/11"),
+       col = c("black", "red", "green", "darkgrey", "blue", "violet"), lty = c(1,1,1, lwd = c(2,2,2)))
+
+```
+
+#The test error rate decreases initially from m = p to m = p/5 and then it increases from m = p/7 to p/10
+
+#The test error rate decreases rapidly with the icrease in number of trees
+
+#While the change in test error rate follows a similar pattern from m = p to m = p/3, remaining values of m follws a similar pattern where a slight spike is seen around number of trees = 50=150 and it becomes constant after that
+
+#Q.8.4.8
+
+##a
+
+```{r}
+set.seed(5)
+train_index <- sample(1:nrow(Carseats), nrow(Carseats) / 2)
+train <- Carseats[train_index, ]
+test <- Carseats[-train_index, ]
+```
+
+##b
+
+```{r}
+tree_model <- tree(Sales ~ .,train)
+plot(tree_model)
+summary(tree_model)
+text(tree_model, pretty = 0, cex = 0.7)
+test_pred <- predict(tree_model, test)
+mean((test_pred - test$Sales)^2)
+baseline<- mean(train$Sales)
+mean((baseline- test$Sales)^2)
+```
+
+#Test MSE is 2.806366
+
+##c
+
+```{r}
+set.seed(2)
+cv_tree_model <- cv.tree(tree_model, K = 10)
+df <- data.frame(n_leaves = cv_tree_model$size,
+                 CV_RSS = cv_tree_model$dev)
+df$min_CV_RSS <- as.numeric(df$CV_RSS == min(df$CV_RSS))
+plot(df$n_leaves, df$CV_RSS, type = "l", col = "grey55", xlab = "Terminal Nodes", ylab = "CV RSS")
+points(df$n_leaves[df$min_CV_RSS == 1], df$CV_RSS[df$min_CV_RSS == 1], col = "green", pch = 16)
+points(df$n_leaves[df$min_CV_RSS == 0], df$CV_RSS[df$min_CV_RSS == 0], col = "blue", pch = 16)
+pruned_tree_model <- prune.tree(tree_model, best = 6)
+test_pred <- predict(pruned_tree_model, test)
+mean((test_pred - test$Sales)^2)
+
+data.frame(size = cv_tree_model$size, 
+           dev = cv_tree_model$dev, 
+           k = cv_tree_model$k)
+```
+
+#CV Error is lowest for tree with 6 nodes 
+
+#The full tree is pruned to obtain 6 node tree
+
+#Test MSE is 2.673161
+
+#The test MSE reduces for pruned tree
+
+##d
+
+```{r}
+set.seed(7)
+bagged = randomForest(y = train$Sales,x = train[ ,-1],mtry=ncol(train)-1,importance=TRUE)
+test_pred <- predict(bagged, test)
+importance(bagged)
+mean((test_pred-test$Sales)^2)
+```
+
+#Test MSE is 2.178019
+
+#Bagging has slightly improved Test MSE
+
+#'Price' and 'ShelveLoc' are the most important variables
+
+##e
+
+```{r}
+set.seed(2)
+rf1.carseats = randomForest(Sales~.,data=train,mtry=7/5,importance=T)
+rf2.carseats = randomForest(Sales~.,data=train,mtry=7/3,importance=T)
+rf3.carseats = randomForest(Sales~.,data=train,mtry=sqrt(7),importance=T)
+rf4.carseats = randomForest(Sales~.,data=train,mtry=7/2,importance=T)
+importance(rf1.carseats)
+importance(rf2.carseats)
+importance(rf3.carseats)
+importance(rf4.carseats)
+varImpPlot(rf1.carseats)
+varImpPlot(rf2.carseats)
+varImpPlot(rf3.carseats)
+varImpPlot(rf4.carseats)
+mse1 = mean((predict(rf1.carseats,newdata = test)-test$Sales)^2)
+mse2 = mean((predict(rf2.carseats,newdata = test)-test$Sales)^2)
+mse3 = mean((predict(rf3.carseats,newdata = test)-test$Sales)^2)
+mse4 = mean((predict(rf4.carseats,newdata = test)-test$Sales)^2)
+mse1
+mse2
+mse3
+mse4
+```
+
+#For all four models, "Price" and "ShelveLoc" are the most important variables
+
+#The MSE for some models in random forest is lower than the MSE in Bagging
+
+##f
+
+```{r}
+library(BART)
+train <- sample(1:nrow(Carseats), nrow(Carseats) / 2)
+x <- Carseats[, 1:11]
+y <- Carseats[, "Sales"]
+xtrain <- x[train, ]
+ytrain <- y[train]
+xtest <- x[-train, ]
+ytest <- y[-train]
+bart_model <- gbart(xtrain, ytrain, x.test = xtest)
+yhat.bart <- bart_model$yhat.test.mean
+mse_bart <- mean((ytest - bart_model$yhat.test.mean)^2)
+mse_bart 
+ord <- order(bart_model$varcount.mean, decreasing = TRUE)
+bart_model$varcount.mean[ord]
+```
+
+#MSE obtained is 0.173918
+
+#Higher value of BART for variable signifies importance of the predictor varaible
+
+#"ShelveLoc" is highly influential
+
+#Q.8.10
+
+##a
+
+```{r}
+Hitters <- Hitters[!is.na(Hitters$Salary), ]
+Hitters$Salary <- log(Hitters$Salary)
+```
+
+##b
+
+```{r}
+set.seed(10)
+sample.data = sample.split(Hitters$Salary, SplitRatio = 200/263) 
+train.set = subset(Hitters, sample.data==TRUE)
+test.set = subset(Hitters, sample.data==FALSE)
+```
+
+##c
+
+```{r}
+lambdas = seq(0.0001,0.5,0.01)
+train.mse = rep(NA,length(lambdas))
+test.mse = rep(NA,length(lambdas))
+
+set.seed(4)
+for (i in lambdas){
+  boost.Hitters = gbm(Salary~., data=train.set,distribution = "gaussian", n.trees = 1000, 
+                      interaction.depth = 4, shrinkage = i)
+  yhat.train = predict(boost.Hitters,newdata = train.set, n.trees = 1000)
+  train.mse[which(i==lambdas)] = mean((yhat.train-train.set$Salary)^2)
+  
+  yhat.test = predict(boost.Hitters,newdata = test.set, n.trees = 1000)
+  test.mse[which(i==lambdas)] = mean((yhat.test-test.set$Salary)^2)
+}
+par(mfrow=c(1,2))
+plot(lambdas,train.mse,type="b",xlab=expression(lambda), ylab="Train MSE")
+```
+
+#Train MSE decreases rapidly from lambda = 0 to 0.1. After that train MSE approaches zero from larger values of lambda
+
+##d
+
+```{r}
+plot(lambdas,test.mse,type="b",xlab=expression(lambda), ylab="Test MSE")
+lambdas[which.min(test.mse)];min(test.mse)
+lambdas[which.min(train.mse)];min(train.mse)
+```
+
+#Test MSE increases from lambda = 0 to 0.3 
+
+#After lambda = 0.3, test MSE follows a zig-zag pattern
+
+##e
+
+#Multiple Linear Regression
+
+```{r}
+lm.fit = lm(Salary~., data=train.set)
+lm.preds = predict(lm.fit, newdata = test.set)
+lm.mse = mean((test.set$Salary-lm.preds)^2)
+lm.mse
+```
+
+#Lasso Model
+
+```{r}
+library(glmnet)
+train = model.matrix(Salary~.,train.set)
+test = model.matrix(Salary~.,test.set)
+y.train = train.set$Salary
+lasso.mod = glmnet(train, y.train, alpha = 1)
+set.seed(4)
+cv.out=cv.glmnet(train, y.train, alpha=1)
+bestlam=cv.out$lambda.min
+lasso.pred=predict(lasso.mod, s=bestlam, newx = test)
+mean((test.set$Salary-lasso.pred)^2)
+```
+
+#Test MSE for Multiple Linear Regression is 0.3294574
+
+#Test MSE for Lasso Model is 0.3326537
+
+#Tesst MSE for Multiple Linear Regression and Lasso Model is much higher as compared to test MSE of boosting
+
+##f
+
+```{r}
+boost.best = gbm(Salary~., data=train.set, distribution = "gaussian", n.trees = 1000, 
+                 interaction.depth = 4, shrinkage = 0.01)
+summary(boost.best)
+```
+
+#"CHits" is the most influential variable followed by "CATBat", "CRBI" and "CWalks"
+
+##g
+
+```{r}
+bag.Hitters = randomForest(Salary~.,train.set,mtry=16,importance=TRUE)
+bag.pred = predict(bag.Hitters,newdata = test.set)
+mean((test.set$Salary-bag.pred)^2)
+```
+
+#Test MSE using bagging is 0.1179348
