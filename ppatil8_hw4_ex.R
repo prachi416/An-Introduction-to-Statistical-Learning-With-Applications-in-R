@@ -1,0 +1,176 @@
+#5.4
+#Q8
+set.seed(1)
+x <- rnorm(100)
+y <- x - 2 * x^2 + rnorm(100)
+#8a:
+#In this, the value of n = 100, p = 2
+#The model used to generate the data is: Y = X - 2X^2 + e
+
+#8b:
+plot(x, y)
+#From the scatter plot, it is visible that the graph between x and y is quadratic between x = (-2, 2) and y = (-8, 2) with maximum x ~ 0.25
+
+#8c:
+library(boot)
+set.seed(10)
+Data <- data.frame(x, y)
+glm.fit.1 <- glm(y ~ x)
+cv.glm(Data, glm.fit.1)$delta[1]
+glm.fit.2 <- glm(y ~ poly(x, 2))
+cv.glm(Data, glm.fit.2)$delta[1]
+glm.fit.3 <- glm(y ~ poly(x, 3))
+cv.glm(Data, glm.fit.3)$delta[1]
+glm.fit.4 <- glm(y ~ poly(x, 4))
+cv.glm(Data, glm.fit.4)$delta[1]
+
+#The test error for model Y = B0 + B1*X + e is 7.28816
+#The test error for model Y = B0 + B1*X + B2*X^2 + e is 0.9374
+#The test error for model Y = B0 + B1*X + B2*X^2 + B3*X^3 + e is 0.95662
+#The test error for model Y = B0 + B1*X + B2*X^2 + B3*X^3 + B4*X^4+ e is 0.95390
+#The test error drastically decreases when we take a model with higher order than 1
+#The most efficient model is with the least test error value which is the model with quadratic value of X
+
+#8d:
+set.seed(21)
+Data <- data.frame(x, y)
+glm.fit.1 <- glm(y ~ x)
+cv.glm(Data, glm.fit.1)$delta[1]
+glm.fit.2 <- glm(y ~ poly(x, 2))
+cv.glm(Data, glm.fit.2)$delta[1]
+glm.fit.3 <- glm(y ~ poly(x, 3))
+cv.glm(Data, glm.fit.3)$delta[1]
+glm.fit.4 <- glm(y ~ poly(x, 4))
+cv.glm(Data, glm.fit.4)$delta[1]
+
+#The test error for model Y = B0 + B1*X + e is 7.28816
+#The test error for model Y = B0 + B1*X + B2*X^2 + e is 0.9374
+#The test error for model Y = B0 + B1*X + B2*X^2 + B3*X^3 + e is 0.95662
+#The test error for model Y = B0 + B1*X + B2*X^2 + B3*X^3 + B4*X^4+ e is 0.95390
+#The test error drastically decreases when we take a model with higher order than 1
+#The most efficient model is with the least test error value which is the model with quadratic value of X
+#The result with different seed value is same because with LOOCV, it evaluates each individual value within the sample and calculates the test error and there is no randomness
+#Results do not depend on the random seed because all observations are used as holdout
+#There is only one LOOCV error statistic
+
+#8e:
+#The second model2 Y = B0 + B1 * X + B2 * X^2 + e has the lowest error rate because it has the same structure as the original model y <- x - 2 * x^2 + rnorm(100)
+
+#8f:
+summary(glm.fit.1)
+summary(glm.fit.2)
+summary(glm.fit.3)
+summary(glm.fit.4)
+#From the summary of glm.fit.2, glm.fit.3, and glm.fit.4 models, it is obvious that the linear and quadratic terms have statistical significance
+#The p-value shows that the cubic and quadratic terms are not statistically significant
+#This agree strongly with our cross-validation results which were minimum for the quadratic model
+#This points towards the second model with only linear and quadratic terms being the most efficiant model
+
+
+
+#6.6
+#Q9
+#9a:
+set.seed(4)
+train_index <- sample(1:nrow(College), round(nrow(College)* 0.75))
+train <- College[train_index, ]
+nrow(train) / nrow(College)
+test <- College[-train_index, ]
+nrow(test) / nrow(College)
+
+#9b:
+library(splines)
+library(glmnet)
+model.full <- lm(Apps ~., data = train)
+summary(model.full)
+pred <- predict(model.full, test)
+(pred_mse <- mean((pred - test$App)^2))
+#The test error obtained is 1910411
+
+#9c:
+train.matrix<-model.matrix(Apps~.,data=train)
+test.matrix<-model.matrix(Apps~.,data=test)
+grid <- 10^seq(4, -2, length =100)
+ridge <- glmnet(train.matrix,train$Apps,alpha=0,lambda=grid,thresh = 1e-12)
+cv.ridge <- cv.glmnet(train.matrix, train$Apps, alpha = 0, lambda = grid, thresh = 1e-12)
+lam.ridge <- cv.ridge$lambda.min
+lam.ridge
+pred.ridge<-predict(ridge,s=lam.ridge,newx =test.matrix)
+mean((test$Apps-pred.ridge)^2)
+#The test error obtained is 2233912
+#The Mean square error for the test dataset obtained in Ridge Regression model is slightly higher than the test error obtained using least squares
+
+#9d:
+lasso <- glmnet(train.matrix, train$Apps, alpha=1, lambda = grid, thresh = 1e-12)
+cv.lasso <- cv.glmnet(train.matrix, train$Apps, alpha=1, lambda = grid, thresh = 1e-12)
+lam.lasso <- cv.lasso$lambda.min
+lam.lasso
+pred.lasso <- predict(lasso, s=lam.lasso, newx = test.matrix)
+mean((test$Apps - pred.lasso)^2)
+predict(lasso,s=lam.lasso,type="coefficients")
+#The Mean Squared Error obtained is 1910551
+#The MSE obtained in Lasso Regression Model is lesser than the one obtained in Ridge Regression Model
+#It is closer to the error obtained using least squares
+#The Lasso model has 18 non-zero coefficients out of 19
+
+#7.9
+#Q10
+#10a:
+library(leaps)
+set.seed(2)
+train_index <- sample(1: nrow(College), round(nrow(College) * 0.75))
+train <- College[train_index, ]
+nrow(train) / nrow(College)
+test <- College[-train_index, ]
+nrow(test) / nrow(College)
+fit <- regsubsets(Outstate ~ ., data = train, nvmax = 17, method = "forward")
+fit.summary <- summary(fit)
+par(mfrow = c(1, 3))
+plot(fit.summary$cp, xlab = "Number of variables", ylab = "Cp", type = "l")
+min.cp <- min(fit.summary$cp)
+std.cp <- sd(fit.summary$cp)
+abline(h = min.cp + 0.2 * std.cp, col = "green", lty = 2)
+abline(h = min.cp - 0.2 * std.cp, col = "red", lty = 2)
+plot(fit.summary$bic, xlab = "Number of variables", ylab = "BIC", type='l')
+min.bic <- min(fit.summary$bic)
+std.bic <- sd(fit.summary$bic)
+abline(h = min.bic + 0.2 * std.bic, col = "green", lty = 2)
+abline(h = min.bic - 0.2 * std.bic, col = "red", lty = 2)
+plot(fit.summary$adjr2, xlab = "Number of variables", ylab = "Adjusted R2", type = "l", ylim = c(0.4, 0.84))
+max.adjr2 <- max(fit.summary$adjr2)
+std.adjr2 <- sd(fit.summary$adjr2)
+abline(h = max.adjr2 + 0.2 * std.adjr2, col = "green", lty = 2)
+abline(h = max.adjr2 - 0.2 * std.adjr2, col = "red", lty = 2)
+fit <- regsubsets(Outstate ~ ., data = College, method = "forward")
+coeffs <- coef(fit, id = 6)
+names(coeffs)
+#Cp, BIC and adjr2 show that size 6 is the minimum size for the subset for which the scores are within 0.2 standard devitations of optimum
+
+#10b:
+fit1 <- gam(Outstate ~ Private + s(Room.Board) + s(PhD) + s(perc.alumni) + s(Expend) + s(Grad.Rate), data = train)
+par(mfrow = c(2, 3))
+plot(fit1, se = T, col = "green")
+#'Private' is a categorical variable but is has some relationship with 'Outstate'
+#'Room.Board', 'perc.alumni' shows close linear relationship with 'Outstate'
+#The remainining varibales don't show any linear relationship with 'Outstate'
+#Heavy non-linear effect can be seen in case of 'Expend' variable
+
+#10c:
+preds <- predict(fit1, newdata = test)
+mse_nonlinear <- mean((preds - test$Outstate)^2)
+fit_lm <- lm(Outstate ~ Private + Room.Board + PhD + perc.alumni + Expend + Grad.Rate, data = train)
+preds_linear <- predict(fit_lm, newdata = test)
+mse_linear <- mean((preds_linear - test$Outstate)^2)
+paste("Non-linear test RMSE:", sqrt(mse_nonlinear))
+paste("Linear test RMSE:", sqrt(mse_linear))
+#The non-linear test RMSE is 1939.5957
+#The linear test RMSE is 1995.6445
+#The non-linear test RMSE is lower as compared to linear test RMSE
+#Even though the magnitude for non-linear is lesser, it is not significantly low so the predictions are not particularly accurate 
+
+#10d:
+summary(fit1)
+#ANOVA shows a strong evidence of non-linear relationship between “Outstate” and “Expend”
+#A strong non-linear relationship can be seen betweeen ”Outstate" with “Grad.Rate”" and “PhD”
+#The smallest p-value is for the smooth effect of Expend, with Room.Board also being significant. 
+#The remaining terms are not significant
