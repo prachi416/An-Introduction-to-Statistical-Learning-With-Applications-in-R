@@ -1,0 +1,185 @@
+---
+title: "ppatil8_Homework6"
+output:
+  pdf_document: default
+  html_document: default
+date: "2024-05-05"
+---
+# Chapter 11 lab
+
+#11.8.1
+
+```{r}
+
+library ( ISLR2 )
+names ( BrainCancer )
+attach(BrainCancer)
+table(sex)
+table(diagnosis)
+table(status)
+
+library(survival)
+fit.surv <- survfit(Surv(time, status) ~ 1)
+plot(fit.surv, xlab = "Months", ylab = "Estimated Probability of Survival")
+fit.sex <- survfit(Surv(time, status) ~ sex)
+plot(fit.surv, xlab = "Months", ylab = "Estimated Probability of Survival", col = c(2, 4))
+legend("bottomleft",levels(sex), col = c(2,4), lty = 1)
+
+logrank.test <- survdiff(Surv(time, status) ~ sex)
+logrank.test
+
+fit.cox <- coxph(Surv(time, status) ~ sex)
+summary(fit.cox)
+
+summary(fit.cox)$logtest[1]
+summary(fit.cox)$waldtest[1]
+summary(fit.cox)$sctest[1]
+logrank.test$chisq
+fit.all <- coxph(Surv(time, status) ~ sex + diagnosis + loc + ki + gtv + stereo)
+fit.all
+modeldata <- data.frame(
+  diagnosis = levels(diagnosis),
+  sex = rep("Female",4),
+  loc = rep("Supratentorial",4),
+  ki = rep(mean(ki),4),
+  gtv = rep(mean(gtv),4),
+  stereo = rep("SRT",4)
+)
+survplots <- survfit(fit.all, newdata = modeldata)
+plot(survplots, xlab = "Months", ylab = "Survival Probability", col = 2:5)
+legend("bottomleft",levels(diagnosis), col = 2:5, lty = 1)
+```
+#11.8.2
+```{r}
+fit.posres <- survfit(Surv(time, status) ~ posres, data = Publication)
+plot(fit.posres, xlab = "Months", ylab = "Probability of Not Being Published", col = 3:4)
+legend("topright", c("Negative Result", "Positive Result"), col = 3:4, lty = 1)
+
+fit.pub <- coxph(Surv(time, status) ~ posres, data = Publication)
+fit.pub
+
+logrank.test <- survdiff(Surv(time, status)~ posres, data = Publication)
+logrank.test
+
+fit.pub2 <- coxph(Surv(time, status) ~ . - mech, data = Publication)
+fit.pub2
+```
+
+#11.8.3
+
+```{r}
+
+set.seed(4)
+N <- 2000
+Operators <- sample(5:15, N, replace = T)
+Center <- sample(c("A", "B", "C"), N, replace = T)
+Time <- sample(c("Morn.", "After.","Even."), N, replace = T)
+X <- model.matrix(~ Operators + Center + Time)[, -1]
+X[1:5,]
+
+true.beta <- c(0.04, -0.3, 0, 0.2, -0.2)
+h.fn <- function(x) return(0.00001 * x)
+library(coxed)
+queuing <- sim.survdata(N=N,T=1000,X=X,
+                            beta=true.beta,hazard.fun=h.fn)
+names(queuing)
+head(queuing$data)
+mean(queuing$data$failed)
+par(mfrow = c(1, 2))
+fit.Center <- survfit(Surv(y, failed)~ Center, data = queuing$data)
+plot(fit.Center, xlab = "Seconds", ylab = "Probability of Still Being on Hold", col = c(2, 4, 5))
+legend("topright", c("Call Center A", "Call Center B", "Call Center C"), col = c(2,4,5), lty =1)
+
+fit.Time <- survfit(Surv(y, failed) ~ Time, data = queuing$data)
+plot(fit.Time, xlab = "Seconds", ylab = "Probability of Still Being on Hold", col = c(2,4,5))
+legend("topright", c("Morning", "Afternoon", "Evening"), col = c(5,2,4), lty =1)
+
+survdiff(Surv(y, failed) ~ Center, data = queuing$data)
+survdiff(Surv(y, failed) ~ Time, data = queuing$data)
+fit.queuing <- coxph(Surv(y, failed) ~ ., data = queuing$data)
+fit.queuing
+```
+
+# Chapter 11 Exercise
+
+#Q.10
+
+```{r}
+library(tibble)
+library(dplyr)
+library(tidyr)
+library ( ISLR2 )
+
+names(BrainCancer)
+attach(BrainCancer)
+data = BrainCancer
+```
+
+#Q.10a
+
+```{r}
+x <- Surv(BrainCancer$time, BrainCancer$status)
+plot(survfit(x ~ 1),
+     xlab = "Months",
+     ylab = "Estimated Probability of Survival",
+     col = "steelblue",
+     conf.int = 0.67
+)
+```
+
+#Q.10b
+
+```{r}
+plot(survfit(x ~ 1),
+     xlab = "Months",
+     ylab = "Estimated Probability of Survival",
+     col = "steelblue",
+     conf.int = 0.67
+)
+fit <- survfit(x ~ 1)
+dat <- tibble(time = c(0, fit$time))
+for (i in 1:200) {
+  y <- survfit(sample(x, 88, replace = TRUE) ~ 1)
+  y <- tibble(time = c(0, y$time), "s{i}" := c(1, y$surv))
+  dat <- left_join(dat, y, by = "time")
+}
+res <- fill(dat, starts_with("s")) |>
+  rowwise() |>
+  transmute(sd = sd(c_across(starts_with("s"))))
+se <- res$sd[2:nrow(res)]
+lines(fit$time, fit$surv - se, lty = 2, col = "red")
+lines(fit$time, fit$surv + se, lty = 2, col = "red")
+```
+
+#The graph shows widening standard error bands with time, indicating decreasing precision in survival probability estimates
+
+#Q.10c
+
+```{r}
+
+fit <- coxph(Surv(time, status) ~ sex + diagnosis + loc + ki + gtv + stereo, data = BrainCancer)
+fit
+```
+
+#High-grade glioma diagnosis and lower ki values significantly impact survival, indicating worse and better outcomes, respectively. However, predictors like sex, tumor location, and treatment modality do not show significant associations with survival
+
+#Q.10d
+
+#To account for other predictors, we fitted a model and used it to predict new data. We varied `ki` while fixing other predictors at their modes or means.her predictors at their respective modes or means.
+
+```{r}
+
+library(ggfortify)
+modaldata <- data.frame(
+  sex = rep("Female", 5),
+  diagnosis = rep("Meningioma", 5),
+  loc = rep("Supratentorial", 5),
+  ki = c(60, 70, 80, 90, 100),
+  gtv = rep(mean(BrainCancer$gtv), 5),
+  stereo = rep("SRT", 5)
+)
+survplots <- survfit(fit, newdata = modaldata)
+plot(survplots, xlab = "Months", ylab = "Survival Probability", col = 2:6)
+legend("bottomleft", c("60", "70", "80", "90", "100"), col = 2:6, lty = 1)
+
+```
